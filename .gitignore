@@ -1,0 +1,6 @@
+python/src/promptscope/_native/
+python/dist/
+python/build/
+python/src/*.egg-info/
+__pycache__/
+.pytest_cache/

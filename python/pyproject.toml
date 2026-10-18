@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promptscope"
+version = "0.1.0"
+description = "Low-latency prompt-injection, indirect-injection and prompt-leak scanner (Go engine, Python bindings)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "See repository" }
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+promptscope = ["_native/*.so", "_native/*.dylib", "_native/*.dll"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
