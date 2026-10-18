@@ -1,0 +1,69 @@
+{
+  "version": "0.1.0",
+  "pack": "baseline",
+  "rules": [
+    {
+      "id": "OVR-001",
+      "category": "instruction_override",
+      "applies_to": ["prompt", "context"],
+      "kind": "literal",
+      "patterns": [
+        "ignore previous instructions",
+        "ignore all previous instructions",
+        "disregard all rules",
+        "system prompt override"
+      ],
+      "weight": 0.85,
+      "description": "FR-1.1 direct instruction override phrases"
+    },
+    {
+      "id": "OVR-002",
+      "category": "instruction_override",
+      "applies_to": ["prompt", "context"],
+      "kind": "regex",
+      "patterns": [
+        "(?i)\\b(ignore|disregard|forget)\\b.{0,20}\\b(previous|prior|above|earlier)\\b.{0,20}\\b(instructions?|rules?|prompts?)\\b"
+      ],
+      "weight": 0.8,
+      "description": "FR-1.1 looser phrasing of the same override"
+    },
+    {
+      "id": "DLM-001",
+      "category": "delimiter_escape",
+      "applies_to": ["prompt", "context"],
+      "kind": "literal",
+      "patterns": ["<|im_start|>", "<|im_end|>", "[INST]", "<<SYS>>", "### System:"],
+      "weight": 0.7,
+      "description": "FR-1.2 chat template and role-spoofing markers"
+    },
+    {
+      "id": "INV-001",
+      "category": "invisible_char",
+      "applies_to": ["prompt", "context"],
+      "kind": "charclass",
+      "patterns": ["U+200B-U+200D", "U+202A-U+202E", "U+2066-U+2069", "U+FEFF"],
+      "weight": 0.3,
+      "action": "strip_match",
+      "description": "FR-2.1 zero-width and bidi control characters"
+    },
+    {
+      "id": "INV-002",
+      "category": "invisible_char",
+      "applies_to": ["context"],
+      "kind": "regex",
+      "patterns": ["(?s)<!--.*?-->"],
+      "weight": 0.4,
+      "action": "strip_match",
+      "description": "FR-2.1 embedded HTML/Markdown comments in retrieved context"
+    },
+    {
+      "id": "TPL-001",
+      "category": "template_bleed",
+      "applies_to": ["output"],
+      "kind": "regex",
+      "patterns": ["\\{\\{\\s*[a-zA-Z_][a-zA-Z0-9_]*\\s*\\}\\}", "\\{system_instruction\\}"],
+      "weight": 0.6,
+      "description": "FR-3.3 unrendered template placeholders in model output"
+    }
+  ]
+}
