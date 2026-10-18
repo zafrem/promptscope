@@ -21,11 +21,12 @@ const (
 // Limits bound the work done per call. Zero values select defaults.
 type Limits struct {
 	MaxInputBytes int // default 64 KiB
-	// The fields below are reserved for the decoding stage (FR-1.3) and are
-	// not enforced yet.
-	MaxDecodeDepth  int // default 3
-	MaxExpansion    int // default 4
-	MinEncodedBytes int // default 24
+
+	// Decoding stage (FR-1.3). A blob that would exceed a limit is left
+	// undecoded and reported as an obfuscation match instead.
+	MaxDecodeDepth  int // nested encodings; default 3
+	MaxExpansion    int // total decoded bytes as a multiple of the input size; default 4
+	MinEncodedBytes int // shortest Base64/hex blob considered; default 24
 }
 
 // Config is read once by New and never mutated afterwards.

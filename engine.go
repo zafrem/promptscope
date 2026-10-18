@@ -71,21 +71,96 @@ func (e *engine) precheck(n int) error {
 	return nil
 }
 
-// collect returns all matches of rules that apply to the entry point, ordered
-// by position.
-func (e *engine) collect(text string, entry entryPoint) []Match {
-	var out []Match
-	for _, ru := range e.rules.Load().rules {
-		if !ru.enabled || ru.entries&entry == 0 {
+// limitRuleID is reported (as an obfuscation match) when an encoded blob is
+// left undecoded because a decoding limit was reached.
+const limitRuleID = "SYS-001"
+
+// ruleSelector chooses which rules a pass runs.
+type ruleSelector uint8
+
+const (
+	selInvisible  ruleSelector = iota // invisible_char rules only; they must see the raw text
+	selNormalized                     // every other rule
+	selAll
+)
+
+func (s ruleSelector) allows(c Category) bool {
+	switch s {
+	case selInvisible:
+		return c == CatInvisibleChar
+	case selNormalized:
+		return c != CatInvisibleChar
+	}
+	return true
+}
+
+// scanner runs one inspection over a single input.
+type scanner struct {
+	rules  *RuleSet
+	entry  entryPoint
+	limits Limits
+	budget int // decoded bytes still allowed
+	out    []Match
+}
+
+// match runs the selected rules over text. resolve maps ranges of text back to
+// the original input.
+func (sc *scanner) match(text string, sel ruleSelector, resolve func(s, e int) (int, int), via []string) {
+	for _, ru := range sc.rules.rules {
+		if !ru.enabled || ru.entries&sc.entry == 0 || !sel.allows(ru.category) {
 			continue
 		}
 		for _, sp := range ru.find(text) {
-			out = append(out, Match{
+			s, e := resolve(sp.Start, sp.End)
+			sc.out = append(sc.out, Match{
 				RuleID: ru.id, Category: ru.category, Weight: ru.weight,
-				Start: sp.Start, End: sp.End,
+				Start: s, End: e, Via: via,
 			})
 		}
 	}
+}
+
+// scanDecoded looks for encoded blobs in text, decodes them and scans the
+// result recursively. Matches inside a blob are reported against the blob's
+// range in the original input.
+func (sc *scanner) scanDecoded(text string, resolve func(s, e int) (int, int), depth int, via []string) {
+	for _, blob := range findEncoded(text, sc.limits.MinEncodedBytes) {
+		bs, be := resolve(blob.span.Start, blob.span.End)
+		cost := len(blob.text)
+		if depth >= sc.limits.MaxDecodeDepth || cost > sc.budget {
+			sc.out = append(sc.out, Match{
+				RuleID: limitRuleID, Category: CatObfuscation, Weight: 0.5,
+				Start: bs, End: be, Via: append(via[:len(via):len(via)], blob.kind),
+			})
+			continue
+		}
+		sc.budget -= cost
+		childVia := append(via[:len(via):len(via)], blob.kind)
+		fixed := func(int, int) (int, int) { return bs, be }
+		inner := normalize(blob.text).text
+		sc.match(inner, selNormalized, fixed, childVia)
+		sc.scanDecoded(inner, fixed, depth+1, childVia)
+	}
+}
+
+// collect returns all matches of rules that apply to the entry point, ordered
+// by position. With normalizeInput set, the text goes through the
+// normalization stage (invisible characters stripped, NFKC applied, encoded
+// blobs decoded) before the non-invisible rules run.
+func (e *engine) collect(text string, entry entryPoint, normalizeInput bool) []Match {
+	sc := &scanner{
+		rules: e.rules.Load(), entry: entry, limits: e.cfg.Limits,
+		budget: e.cfg.Limits.MaxExpansion * len(text),
+	}
+	if !normalizeInput {
+		sc.match(text, selAll, func(s, e int) (int, int) { return s, e }, nil)
+	} else {
+		sc.match(text, selInvisible, func(s, e int) (int, int) { return s, e }, nil)
+		n := normalize(text)
+		sc.match(n.text, selNormalized, n.resolve, nil)
+		sc.scanDecoded(n.text, n.resolve, 0, nil)
+	}
+	out := sc.out
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Start != out[j].Start {
 			return out[i].Start < out[j].Start
@@ -115,7 +190,7 @@ func (e *engine) ScanPrompt(prompt string) (ScanResult, error) {
 	if err := e.precheck(len(prompt)); err != nil {
 		return ScanResult{IsSafe: e.cfg.FailOpen, RiskScore: failScore(e.cfg.FailOpen)}, err
 	}
-	matches := e.collect(prompt, entryPrompt)
+	matches := e.collect(prompt, entryPrompt, true)
 	s := score(matches)
 	return ScanResult{IsSafe: s < e.cfg.PromptThreshold, RiskScore: s, Matches: matches}, nil
 }
@@ -128,7 +203,7 @@ func (e *engine) SanitizeContext(chunk string) (SanitizeResult, error) {
 		return SanitizeResult{Blocked: true, HasInjection: true, RiskScore: 1,
 			Removed: []Span{{0, len(chunk)}}}, err
 	}
-	matches := e.collect(chunk, entryContext)
+	matches := e.collect(chunk, entryContext, true)
 	s := score(matches)
 	res := SanitizeResult{RiskScore: s, HasInjection: len(matches) > 0, Matches: matches}
 
@@ -226,7 +301,7 @@ func (e *engine) ScanOutput(response string) (OutputResult, error) {
 	if err := e.precheck(len(response)); err != nil {
 		return OutputResult{IsLeaked: !e.cfg.FailOpen, LeakConfidence: failScore(e.cfg.FailOpen)}, err
 	}
-	res := OutputResult{Matches: e.collect(response, entryOutput)}
+	res := OutputResult{Matches: e.collect(response, entryOutput, false)}
 	conf := score(res.Matches)
 
 	e.mu.RLock()
