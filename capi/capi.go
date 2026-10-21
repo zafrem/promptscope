@@ -106,11 +106,19 @@ func goString(p *C.char, n C.size_t) string {
 	return C.GoStringN(p, C.int(n))
 }
 
-func lookup(h C.uint64_t) (promptscope.Engine, bool) {
+func lookup(h C.uint64_t) (promptscope.Engine, bool) { return get(uint64(h)) }
+
+func get(h uint64) (promptscope.Engine, bool) {
 	mu.RLock()
 	defer mu.RUnlock()
-	e, ok := engines[uint64(h)]
+	e, ok := engines[h]
 	return e, ok
+}
+
+func drop(h uint64) {
+	mu.Lock()
+	delete(engines, h)
+	mu.Unlock()
 }
 
 func buildConfig(raw string) (promptscope.Config, error) {
@@ -173,11 +181,7 @@ func ps_engine_new(config *C.char, configLen C.size_t) (out *C.char) {
 // ps_engine_free releases an engine. Freeing an unknown handle is a no-op.
 //
 //export ps_engine_free
-func ps_engine_free(h C.uint64_t) {
-	mu.Lock()
-	delete(engines, uint64(h))
-	mu.Unlock()
-}
+func ps_engine_free(h C.uint64_t) { drop(uint64(h)) }
 
 // ps_load_rules parses a JSON rule set and installs it. With merge non-zero it
 // is layered over the baseline pack; otherwise it replaces all rules.
