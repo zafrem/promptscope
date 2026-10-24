@@ -18,7 +18,8 @@ Written in Go, with Python bindings. Showcase: <http://promptscope.codeforlife.d
 | `SanitizeContext` | retrieved text (RAG chunks, pages, files) | the same, plus HTML comments; cuts the injected span (filter) or drops the chunk (block) |
 | `ScanOutput` | model replies | a registered canary token, a copied system prompt, unfilled template placeholders |
 
-Text goes through four steps: strip invisible characters, normalize to Unicode NFKC, decode Base64/hex
+Text goes through five steps: strip invisible characters, normalize to Unicode NFKC, fold Cyrillic look-alike
+letters to Latin (only inside words that also contain Latin letters, so Russian text is left alone), decode Base64/hex
 blobs (bounded in depth and size, accepted only if the result reads as text), then match rules. Every match
 carries byte offsets into your original input. The risk score combines rule weights with noisy-OR:
 `1 - Π(1 - weight)`, each rule counted once.
@@ -102,8 +103,8 @@ Through the C API and Python, pass `packs=["english-only"]` when creating the en
 
 ## Limits
 
-Paraphrases, other languages, look-alike letters from other alphabets (homoglyphs), and letters split by
-punctuation all get through the baseline rules, and detecting instructions that are only phrased as plain
+Paraphrases, other languages, look-alike letters from alphabets other than Cyrillic (for example Greek),
+Cyrillic words made only of look-alikes, and letters split by punctuation all get through the baseline rules, and detecting instructions that are only phrased as plain
 statements in third-party text is not built. The site shows recorded examples. A low score is not proof
 that an input is safe.
 
@@ -133,7 +134,7 @@ rules, a scan took about 0.6 ms for ASCII text and just under 1.0 ms for non-ASC
 
 ## Not finished
 
-- Decoding limits (`MaxDecodeDepth`, `MaxExpansion`) are enforced; homoglyph folding is not.
+- Decoding limits (`MaxDecodeDepth`, `MaxExpansion`) are enforced; homoglyph folding covers Cyrillic letters inside words that also have Latin letters (rule `HMG-001` flags such a word); Greek and other scripts are not folded.
 - No rule yet for instruction-like statements embedded in third-party text (FR-2.2 in the SRS).
 - Python wheels have only been built and tested on Linux x86_64.
 - No license has been chosen.

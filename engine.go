@@ -80,6 +80,7 @@ type ruleSelector uint8
 
 const (
 	selInvisible  ruleSelector = iota // invisible_char rules only; they must see the raw text
+	selPreFold                        // homoglyph rules only; they must see look-alikes before folding
 	selNormalized                     // every other rule
 	selAll
 )
@@ -88,8 +89,10 @@ func (s ruleSelector) allows(c Category) bool {
 	switch s {
 	case selInvisible:
 		return c == CatInvisibleChar
+	case selPreFold:
+		return c == CatHomoglyph
 	case selNormalized:
-		return c != CatInvisibleChar
+		return c != CatInvisibleChar && c != CatHomoglyph
 	}
 	return true
 }
@@ -145,8 +148,8 @@ func (sc *scanner) scanDecoded(text string, resolve func(s, e int) (int, int), d
 
 // collect returns all matches of rules that apply to the entry point, ordered
 // by position. With normalizeInput set, the text goes through the
-// normalization stage (invisible characters stripped, NFKC applied, encoded
-// blobs decoded) before the non-invisible rules run.
+// normalization stage (invisible characters stripped, NFKC applied, look-alike
+// letters folded to Latin, encoded blobs decoded) before the non-invisible rules run.
 func (e *engine) collect(text string, entry entryPoint, normalizeInput bool) []Match {
 	sc := &scanner{
 		rules: e.rules.Load(), entry: entry, limits: e.cfg.Limits,
@@ -157,6 +160,7 @@ func (e *engine) collect(text string, entry entryPoint, normalizeInput bool) []M
 	} else {
 		sc.match(text, selInvisible, func(s, e int) (int, int) { return s, e }, nil)
 		n := normalize(text)
+		sc.match(n.preFold, selPreFold, n.resolvePreFold, nil)
 		sc.match(n.text, selNormalized, n.resolve, nil)
 		sc.scanDecoded(n.text, n.resolve, 0, nil)
 	}

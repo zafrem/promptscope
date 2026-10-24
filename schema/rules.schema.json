@@ -40,7 +40,8 @@
             "invisible_char",
             "boundary_violation",
             "template_bleed",
-            "unexpected_script"
+            "unexpected_script",
+            "homoglyph"
           ]
         },
         "applies_to": {
