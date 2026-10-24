@@ -18,6 +18,28 @@ var baselineJSON []byte
 //go:embed rules/english-only.json
 var englishOnlyJSON []byte
 
+// langPacks are the per-language instruction-override packs, keyed by the name BuiltinPack accepts.
+var langPacks = map[string][]byte{}
+
+//go:embed rules/lang-ko.json
+var langKoJSON []byte
+
+//go:embed rules/lang-ja.json
+var langJaJSON []byte
+
+//go:embed rules/lang-zh-hans.json
+var langZhHansJSON []byte
+
+//go:embed rules/lang-zh-hant.json
+var langZhHantJSON []byte
+
+func init() {
+	langPacks["lang-ko"] = langKoJSON
+	langPacks["lang-ja"] = langJaJSON
+	langPacks["lang-zh-hans"] = langZhHansJSON
+	langPacks["lang-zh-hant"] = langZhHantJSON
+}
+
 const maxRulesBytes = 16 << 20
 
 type entryPoint uint8
@@ -99,15 +121,23 @@ func EnglishOnlyRules() *RuleSet {
 }
 
 // BuiltinPackNames lists the packs BuiltinPack accepts.
-var BuiltinPackNames = []string{"baseline", "english-only"}
+var BuiltinPackNames = []string{"baseline", "english-only", "lang-ko", "lang-ja", "lang-zh-hans", "lang-zh-hant"}
 
-// BuiltinPack returns an embedded rule pack by name.
+// BuiltinPack returns an embedded rule pack by name: baseline, english-only, or one of the lang-* packs
+// (instruction-override phrases in Korean, Japanese, Simplified and Traditional Chinese).
 func BuiltinPack(name string) (*RuleSet, error) {
 	switch name {
 	case "baseline":
 		return BaselineRules(), nil
 	case "english-only":
 		return EnglishOnlyRules(), nil
+	}
+	if data, ok := langPacks[name]; ok {
+		rs, err := LoadRules(bytes.NewReader(data))
+		if err != nil {
+			panic("promptscope: embedded " + name + " rules are invalid: " + err.Error())
+		}
+		return rs, nil
 	}
 	return nil, fmt.Errorf("%w: unknown built-in pack %q (have %s)", ErrInvalidRules, name, strings.Join(BuiltinPackNames, ", "))
 }

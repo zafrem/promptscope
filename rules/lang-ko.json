@@ -1,0 +1,43 @@
+{
+  "version": "0.1.0",
+  "pack": "lang-ko",
+  "rules": [
+    {
+      "id": "KOR-001",
+      "category": "instruction_override",
+      "applies_to": [
+        "prompt",
+        "context"
+      ],
+      "kind": "literal",
+      "patterns": [
+        "이전 지시를 무시",
+        "이전 지시를 모두 무시",
+        "이전 지시사항을 무시",
+        "이전 명령을 무시",
+        "이전 지침을 무시",
+        "이전의 모든 지시를 무시",
+        "위의 지시를 무시",
+        "앞의 지시를 무시",
+        "모든 규칙을 무시",
+        "시스템 프롬프트를 무시"
+      ],
+      "weight": 0.85,
+      "description": "Korean instruction override phrases (counterpart of OVR-001)"
+    },
+    {
+      "id": "KOR-002",
+      "category": "instruction_override",
+      "applies_to": [
+        "prompt",
+        "context"
+      ],
+      "kind": "regex",
+      "patterns": [
+        "(이전|앞선|앞의|위의|기존|지금까지의?)\\s*(모든\\s*)?(지시|지시사항|명령|지침|규칙|프롬프트)[가-힣]{0,2}\\s*(모두\\s*|전부\\s*)?(무시|잊어|잊으|따르지\\s*마)"
+      ],
+      "weight": 0.8,
+      "description": "Korean looser phrasing of the same override (counterpart of OVR-002)"
+    }
+  ]
+}

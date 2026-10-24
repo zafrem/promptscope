@@ -1,0 +1,42 @@
+{
+  "version": "0.1.0",
+  "pack": "lang-ja",
+  "rules": [
+    {
+      "id": "JPN-001",
+      "category": "instruction_override",
+      "applies_to": [
+        "prompt",
+        "context"
+      ],
+      "kind": "literal",
+      "patterns": [
+        "以前の指示を無視",
+        "以前の指示をすべて無視",
+        "前の指示を無視",
+        "前の指示をすべて無視",
+        "これまでの指示を無視",
+        "上記の指示を無視",
+        "以前の命令を無視",
+        "先ほどの指示を無視",
+        "すべてのルールを無視"
+      ],
+      "weight": 0.85,
+      "description": "Japanese instruction override phrases (counterpart of OVR-001)"
+    },
+    {
+      "id": "JPN-002",
+      "category": "instruction_override",
+      "applies_to": [
+        "prompt",
+        "context"
+      ],
+      "kind": "regex",
+      "patterns": [
+        "(以前|前|これまで|今まで|先ほど|上記|上|それまで)の(すべて|全て|全部)?(の)?(指示|命令|指令|ルール|規則|プロンプト)(を|は)?(すべて|全て|全部)?(無視|忘れ|守らな|従わな)"
+      ],
+      "weight": 0.8,
+      "description": "Japanese looser phrasing of the same override (counterpart of OVR-002)"
+    }
+  ]
+}

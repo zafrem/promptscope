@@ -101,6 +101,24 @@ rs, _ := promptscope.MergeRules(promptscope.BaselineRules(), promptscope.English
 
 Through the C API and Python, pass `packs=["english-only"]` when creating the engine; `load_rules` keeps it.
 
+### Optional packs: `lang-ko`, `lang-ja`, `lang-zh-hans`, `lang-zh-hant`
+
+The baseline only has English phrases. Each of these adds two instruction-override rules for one language,
+counterparts of `OVR-001` (listed phrases, weight 0.85) and `OVR-002` (a looser pattern, weight 0.8): `KOR-`,
+`JPN-`, `CHS-` and `CHT-` followed by 001 and 002. Load only the languages your app sees, so you pay for no
+more rules than you need and no more false positives than you accept. Simplified and Traditional are separate
+packs because the characters differ; a sentence written with shared characters matches both.
+
+```go
+rs, _ := promptscope.BuiltinPack("lang-ko")
+merged, _ := promptscope.MergeRules(promptscope.BaselineRules(), rs)
+```
+
+In Python, `Engine(packs=["lang-ko", "lang-ja"])`. They are phrase rules, so they share the limits of every
+phrase rule: rewordings, spaced-out text and a sentence that talks about the phrase ("do not ignore previous
+instructions") are not handled correctly. `go run ./experiments/langpacks` in the forge repo lists the misses.
+For an English-only app, `english-only` is the stronger control.
+
 ## Limits
 
 Paraphrases, other languages, look-alike letters from alphabets other than Cyrillic (for example Greek),
@@ -115,7 +133,7 @@ that an input is safe.
 internal/       vendored golang.org/x/text norm + transform (BSD; see internal/norm/LICENSE)
 capi/           C ABI (c-shared library, JSON envelopes), used by the Python package
 python/         Python package (ctypes) and tests
-rules/          embedded baseline pack and the optional english-only pack
+rules/          embedded baseline pack and the optional english-only and lang-* packs
 schema/         JSON Schema and an example rule set
 docs/           SRS and the section 4 design proposal
 ```

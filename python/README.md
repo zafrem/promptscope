@@ -24,6 +24,7 @@ unless the engine was created with `fail_open=True`.
 
 For English-only applications, `Engine(packs=["english-only"])` also flags Hangul, kana and Han characters
 in prompts (rules `SCR-001`..`SCR-005`). It is off by default; see the main README.
+`packs=["lang-ko", "lang-ja", "lang-zh-hans", "lang-zh-hant"]` adds instruction-override phrases for those languages.
 
 ## Building from source
 
