@@ -39,7 +39,8 @@
             "obfuscation",
             "invisible_char",
             "boundary_violation",
-            "template_bleed"
+            "template_bleed",
+            "unexpected_script"
           ]
         },
         "applies_to": {

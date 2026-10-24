@@ -1,6 +1,6 @@
 import json
 import threading
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 from . import _native
 from .types import (
@@ -38,6 +38,10 @@ class Engine:
     Scan methods raise :class:`PromptscopeError` when the engine reports an
     error (for example ``input_too_large``). The exception's ``result`` holds
     the engine's verdict, which is the *unsafe* one unless ``fail_open=True``.
+
+    ``packs`` names optional built-in rule packs layered over the baseline. The only one is
+    ``"english-only"``, which flags Hangul, kana and Han characters in prompts. An unknown name
+    raises :class:`PromptscopeError` (``invalid_argument``).
     """
 
     def __init__(
@@ -48,6 +52,7 @@ class Engine:
         leak_threshold: Optional[float] = None,
         sanitize_mode: str = "filter",
         fail_open: bool = False,
+        packs: Sequence[str] = (),
         max_input_bytes: Optional[int] = None,
         max_decode_depth: Optional[int] = None,
         max_expansion: Optional[int] = None,
@@ -65,9 +70,10 @@ class Engine:
             "leak_threshold": leak_threshold,
             "sanitize_mode": sanitize_mode,
             "fail_open": fail_open,
+            "packs": list(packs),
             "limits": {k: v for k, v in limits.items() if v is not None},
         }
-        config = {k: v for k, v in config.items() if v is not None}
+        config = {k: v for k, v in config.items() if v is not None and v != []}
         self._lock = threading.Lock()
         self._handle = _unwrap(_native.call("ps_engine_new", json.dumps(config)))["handle"]
 

@@ -78,6 +78,28 @@ merged, _ := promptscope.MergeRules(promptscope.BaselineRules(), rs)
 eng.Reload(merged) // atomic; in-flight scans finish on the old set
 ```
 
+### Optional pack: `english-only`
+
+For applications whose users are expected to write English, [`rules/english-only.json`](rules/english-only.json)
+flags Hangul (`SCR-001`), Hiragana/Katakana (`SCR-002`) and Han ideographs (`SCR-003`) in **prompts**, category
+`unexpected_script`. `SCR-004`/`SCR-005` are low-weight markers for characters used only in Simplified or only
+in Traditional Chinese, so the report can tell the two apart; text with only shared characters reports
+`SCR-003` alone. It is not in the baseline because it would flag every non-English user, and it is a policy
+signal, not an attack signature. Details:
+
+- Each script rule weighs 0.6, above the default prompt threshold of 0.5, so one match makes the prompt unsafe.
+  Scores compound, so Japanese (kana plus kanji) scores higher than Chinese. Override weights with your own pack.
+- It applies to prompts only. Retrieved context and model output may legitimately be multilingual, and filter
+  mode would delete them. Re-declare a rule with `applies_to` including `context` to change that.
+- Scripts are found after NFKC and decoding, so half-width katakana and Base64-wrapped text are caught.
+- It looks at scripts, not languages: it cannot tell Chinese from Japanese kanji or Korean hanja.
+
+```go
+rs, _ := promptscope.MergeRules(promptscope.BaselineRules(), promptscope.EnglishOnlyRules())
+```
+
+Through the C API and Python, pass `packs=["english-only"]` when creating the engine; `load_rules` keeps it.
+
 ## Limits
 
 Paraphrases, other languages, look-alike letters from other alphabets (homoglyphs), and letters split by
@@ -92,7 +114,7 @@ that an input is safe.
 internal/       vendored golang.org/x/text norm + transform (BSD; see internal/norm/LICENSE)
 capi/           C ABI (c-shared library, JSON envelopes), used by the Python package
 python/         Python package (ctypes) and tests
-rules/          embedded baseline pack
+rules/          embedded baseline pack and the optional english-only pack
 schema/         JSON Schema and an example rule set
 docs/           SRS and the section 4 design proposal
 ```

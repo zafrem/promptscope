@@ -38,15 +38,17 @@ const abiVersion = 1
 var (
 	mu      sync.RWMutex
 	engines = map[uint64]promptscope.Engine{}
+	packs   = map[uint64][]string{} // built-in packs layered over the baseline, per engine
 	next    uint64
 )
 
 type configJSON struct {
-	PromptThreshold  float64 `json:"prompt_threshold"`
-	ContextThreshold float64 `json:"context_threshold"`
-	LeakThreshold    float64 `json:"leak_threshold"`
-	SanitizeMode     string  `json:"sanitize_mode"` // "filter" (default) or "block"
-	FailOpen         bool    `json:"fail_open"`
+	PromptThreshold  float64  `json:"prompt_threshold"`
+	ContextThreshold float64  `json:"context_threshold"`
+	LeakThreshold    float64  `json:"leak_threshold"`
+	SanitizeMode     string   `json:"sanitize_mode"` // "filter" (default) or "block"
+	FailOpen         bool     `json:"fail_open"`
+	Packs            []string `json:"packs"` // built-in packs on top of the baseline, e.g. "english-only"
 	Limits           struct {
 		MaxInputBytes   int `json:"max_input_bytes"`
 		MaxDecodeDepth  int `json:"max_decode_depth"`
@@ -118,17 +120,39 @@ func get(h uint64) (promptscope.Engine, bool) {
 func drop(h uint64) {
 	mu.Lock()
 	delete(engines, h)
+	delete(packs, h)
 	mu.Unlock()
 }
 
-func buildConfig(raw string) (promptscope.Config, error) {
+func decodeConfig(raw string) (configJSON, error) {
 	var c configJSON
 	if raw != "" {
 		dec := json.NewDecoder(bytes.NewReader([]byte(raw)))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&c); err != nil {
-			return promptscope.Config{}, err
+			return c, err
 		}
+	}
+	return c, nil
+}
+
+// buildRules returns the baseline pack with the named built-in packs merged on top, in order.
+func buildRules(names []string) (*promptscope.RuleSet, error) {
+	sets := []*promptscope.RuleSet{promptscope.BaselineRules()}
+	for _, n := range names {
+		rs, err := promptscope.BuiltinPack(n)
+		if err != nil {
+			return nil, err
+		}
+		sets = append(sets, rs)
+	}
+	return promptscope.MergeRules(sets...)
+}
+
+func buildConfig(raw string) (promptscope.Config, error) {
+	c, err := decodeConfig(raw)
+	if err != nil {
+		return promptscope.Config{}, err
 	}
 	cfg := promptscope.Config{
 		PromptThreshold:  c.PromptThreshold,
@@ -156,17 +180,23 @@ func buildConfig(raw string) (promptscope.Config, error) {
 //export ps_abi_version
 func ps_abi_version() C.int { return abiVersion }
 
-// ps_engine_new creates an engine with the embedded baseline rules.
+// ps_engine_new creates an engine with the embedded baseline rules plus any built-in packs named in config.
 // config is optional JSON (may be NULL). The result is {"handle": N}.
 //
 //export ps_engine_new
 func ps_engine_new(config *C.char, configLen C.size_t) (out *C.char) {
 	defer guard(&out)
-	cfg, err := buildConfig(goString(config, configLen))
+	raw := goString(config, configLen)
+	cfg, err := buildConfig(raw)
 	if err != nil {
 		return fail("invalid_argument", err, nil)
 	}
-	e, err := promptscope.New(cfg, promptscope.BaselineRules())
+	c, _ := decodeConfig(raw) // already validated by buildConfig
+	rules, err := buildRules(c.Packs)
+	if err != nil {
+		return fail("invalid_argument", err, nil)
+	}
+	e, err := promptscope.New(cfg, rules)
 	if err != nil {
 		return fail(errCode(err), err, nil)
 	}
@@ -174,6 +204,7 @@ func ps_engine_new(config *C.char, configLen C.size_t) (out *C.char) {
 	next++
 	h := next
 	engines[h] = e
+	packs[h] = c.Packs
 	mu.Unlock()
 	return ok(map[string]uint64{"handle": h})
 }
@@ -184,7 +215,7 @@ func ps_engine_new(config *C.char, configLen C.size_t) (out *C.char) {
 func ps_engine_free(h C.uint64_t) { drop(uint64(h)) }
 
 // ps_load_rules parses a JSON rule set and installs it. With merge non-zero it
-// is layered over the baseline pack; otherwise it replaces all rules.
+// is layered over the baseline pack and the engine's configured packs; otherwise it replaces all rules.
 //
 //export ps_load_rules
 func ps_load_rules(h C.uint64_t, rules *C.char, rulesLen C.size_t, merge C.int) (out *C.char) {
@@ -198,7 +229,13 @@ func ps_load_rules(h C.uint64_t, rules *C.char, rulesLen C.size_t, merge C.int) 
 		return fail(errCode(err), err, nil)
 	}
 	if merge != 0 {
-		if rs, err = promptscope.MergeRules(promptscope.BaselineRules(), rs); err != nil {
+		mu.RLock()
+		base, err := buildRules(packs[uint64(h)])
+		mu.RUnlock()
+		if err != nil {
+			return fail(errCode(err), err, nil)
+		}
+		if rs, err = promptscope.MergeRules(base, rs); err != nil {
 			return fail(errCode(err), err, nil)
 		}
 	}

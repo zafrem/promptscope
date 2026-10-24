@@ -10,12 +10,15 @@ const (
 	CatInvisibleChar       Category = "invisible_char"       // FR-2.1
 	CatBoundaryViolation   Category = "boundary_violation"   // FR-2.2
 	CatTemplateBleed       Category = "template_bleed"       // FR-3.3
+	// CatUnexpectedScript marks text in a script the deployment does not expect (for example Hangul, kana or
+	// Han in an English-only application). It is a policy signal, not an attack signature.
+	CatUnexpectedScript Category = "unexpected_script"
 )
 
 func (c Category) valid() bool {
 	switch c {
 	case CatInstructionOverride, CatDelimiterEscape, CatObfuscation,
-		CatInvisibleChar, CatBoundaryViolation, CatTemplateBleed:
+		CatInvisibleChar, CatBoundaryViolation, CatTemplateBleed, CatUnexpectedScript:
 		return true
 	}
 	return false

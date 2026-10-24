@@ -22,6 +22,9 @@ Scan calls raise `PromptscopeError` on engine errors (such as `input_too_large`)
 the exception's `result` holds the engine's verdict, which is the unsafe one
 unless the engine was created with `fail_open=True`.
 
+For English-only applications, `Engine(packs=["english-only"])` also flags Hangul, kana and Han characters
+in prompts (rules `SCR-001`..`SCR-005`). It is off by default; see the main README.
+
 ## Building from source
 
 ```

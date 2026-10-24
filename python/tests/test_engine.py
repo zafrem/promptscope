@@ -152,3 +152,34 @@ def test_threads_share_an_engine(engine):
     for t in threads:
         t.join()
     assert not errors
+
+
+KOREAN = "안녕하세요 도와주세요"
+
+
+def test_english_only_pack_flags_scripts():
+    with Engine(packs=["english-only"]) as e:
+        r = e.scan_prompt(KOREAN)
+        assert not r.is_safe
+        assert any(m.rule_id == "SCR-001" for m in r.matches)
+        assert e.scan_prompt("What is the capital of France?").is_safe
+
+
+def test_default_engine_ignores_scripts(engine):
+    assert engine.scan_prompt(KOREAN).is_safe
+
+
+def test_packs_survive_load_rules():
+    rules = {"version": "t1", "rules": [{
+        "id": "XTR-001", "category": "obfuscation", "applies_to": ["prompt"],
+        "kind": "literal", "patterns": ["zzz-marker"], "weight": 0.9}]}
+    with Engine(packs=["english-only"]) as e:
+        e.load_rules(rules)
+        assert not e.scan_prompt(KOREAN).is_safe
+        assert not e.scan_prompt("zzz-marker").is_safe
+
+
+def test_unknown_pack_is_rejected():
+    with pytest.raises(PromptscopeError) as exc:
+        Engine(packs=["nope"])
+    assert exc.value.code == "invalid_argument"

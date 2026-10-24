@@ -95,3 +95,43 @@ func TestEngineRegistry(t *testing.T) {
 		t.Error("handle 0 must never be valid")
 	}
 }
+
+func TestBuildRulesPacks(t *testing.T) {
+	base, err := buildRules(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	with, err := buildRules([]string{"english-only"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if with.Len() <= base.Len() {
+		t.Errorf("english-only added no rules: %d vs %d", with.Len(), base.Len())
+	}
+	if _, err := buildRules([]string{"nope"}); !errors.Is(err, promptscope.ErrInvalidRules) {
+		t.Errorf("unknown pack error = %v", err)
+	}
+}
+
+func TestDecodeConfigPacks(t *testing.T) {
+	c, err := decodeConfig(`{"packs":["english-only"],"fail_open":true}`)
+	if err != nil || len(c.Packs) != 1 || c.Packs[0] != "english-only" {
+		t.Errorf("got %+v, %v", c, err)
+	}
+	if _, err := decodeConfig(`{"pack":["x"]}`); err == nil {
+		t.Error("unknown field accepted")
+	}
+}
+
+func TestDropForgetsPacks(t *testing.T) {
+	mu.Lock()
+	packs[999] = []string{"english-only"}
+	mu.Unlock()
+	drop(999)
+	mu.RLock()
+	_, left := packs[999]
+	mu.RUnlock()
+	if left {
+		t.Error("packs entry survived drop")
+	}
+}

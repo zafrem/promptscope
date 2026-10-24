@@ -15,6 +15,9 @@ import (
 //go:embed rules/baseline.json
 var baselineJSON []byte
 
+//go:embed rules/english-only.json
+var englishOnlyJSON []byte
+
 const maxRulesBytes = 16 << 20
 
 type entryPoint uint8
@@ -82,6 +85,31 @@ func BaselineRules() *RuleSet {
 		panic("promptscope: embedded baseline rules are invalid: " + err.Error())
 	}
 	return rs
+}
+
+// EnglishOnlyRules returns an optional pack for deployments whose input should be English. It flags Hangul,
+// Hiragana/Katakana and Han characters in prompts (rules SCR-001 to SCR-005, category unexpected_script).
+// It is not part of the baseline: layer it on with MergeRules(BaselineRules(), EnglishOnlyRules()).
+func EnglishOnlyRules() *RuleSet {
+	rs, err := LoadRules(bytes.NewReader(englishOnlyJSON))
+	if err != nil {
+		panic("promptscope: embedded english-only rules are invalid: " + err.Error())
+	}
+	return rs
+}
+
+// BuiltinPackNames lists the packs BuiltinPack accepts.
+var BuiltinPackNames = []string{"baseline", "english-only"}
+
+// BuiltinPack returns an embedded rule pack by name.
+func BuiltinPack(name string) (*RuleSet, error) {
+	switch name {
+	case "baseline":
+		return BaselineRules(), nil
+	case "english-only":
+		return EnglishOnlyRules(), nil
+	}
+	return nil, fmt.Errorf("%w: unknown built-in pack %q (have %s)", ErrInvalidRules, name, strings.Join(BuiltinPackNames, ", "))
 }
 
 // LoadRulesFile parses and validates a JSON rule file.
