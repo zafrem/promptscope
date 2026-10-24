@@ -6,7 +6,7 @@ library. It reports a score and where the matches are; your code decides what to
 
 Written in Go, with Python bindings. Showcase: <http://promptscope.codeforlife.dev/>
 
-> **Status: early draft (v0.1.0).** The built-in pack has six example rules, not a vetted list. No detection
+> **Status: early draft (v0.1.0).** The built-in pack has seven example rules, not a vetted list. No detection
 > rate has been measured, rule weights and thresholds are provisional, and no license has been chosen yet.
 > Treat it as one layer of defense, not the only one. See [what it does not catch](#limits).
 
@@ -18,8 +18,8 @@ Written in Go, with Python bindings. Showcase: <http://promptscope.codeforlife.d
 | `SanitizeContext` | retrieved text (RAG chunks, pages, files) | the same, plus HTML comments; cuts the injected span (filter) or drops the chunk (block) |
 | `ScanOutput` | model replies | a registered canary token, a copied system prompt, unfilled template placeholders |
 
-Text goes through five steps: strip invisible characters, normalize to Unicode NFKC, fold Cyrillic look-alike
-letters to Latin (only inside words that also contain Latin letters, so Russian text is left alone), decode Base64/hex
+Text goes through four steps: strip invisible characters, normalize (Unicode NFKC, then Cyrillic look-alike letters
+folded to Latin, only inside words that also contain Latin letters, so Russian text is left alone), decode Base64/hex
 blobs (bounded in depth and size, accepted only if the result reads as text), then match rules. Every match
 carries byte offsets into your original input. The risk score combines rule weights with noisy-OR:
 `1 - Π(1 - weight)`, each rule counted once.
@@ -148,7 +148,8 @@ make wheel         # platform wheel in python/dist/
 
 Latency target: median under 1 ms for 1,000 characters. On a 2 GHz dual-core Celeron with the six baseline
 rules, a scan took about 0.6 ms for ASCII text and just under 1.0 ms for non-ASCII text
-(`go test -bench .`). Larger rule sets will cost more.
+(`go test -bench .`), measured before the look-alike step and the seventh rule were added and not
+measured again on that machine. Larger rule sets will cost more.
 
 ## Not finished
 
